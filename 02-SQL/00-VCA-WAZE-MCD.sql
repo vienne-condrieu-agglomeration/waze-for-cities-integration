@@ -60,8 +60,7 @@ CREATE TABLE waze.waze_reference_alert_type (
 );
 CREATE INDEX waze_reference_alert_type_idx ON waze.waze_reference_alert_type USING btree (alert_type);
 CREATE INDEX waze_reference_alert_subtype_idx ON waze.waze_reference_alert_type USING btree (alert_subtype);
-COMMENT ON TABLE waze.waze_reference_alert_type IS 'WAZE - Table de référence des types et sos-types d''alertes
-Guide de référence pour les alertes, embouteillages et irrégularités';
+COMMENT ON TABLE waze.waze_reference_alert_type IS 'WAZE - Table de référence des types et sous-types d''alertes - Guide de référence pour les alertes, embouteillages et irrégularités';
 
 -- Column comments
 COMMENT ON COLUMN waze.waze_reference_alert_type.gid IS 'PK.';
@@ -109,3 +108,42 @@ INSERT INTO waze.waze_reference_alert_type VALUES (DEFAULT, 'ROAD_CLOSED ', 'ROA
 INSERT INTO waze.waze_reference_alert_type VALUES (DEFAULT, 'ROAD_CLOSED ', 'ROAD_CLOSED_CONSTRUCTION', 'ROUTE FERMÉE - TRAVAUX');
 INSERT INTO waze.waze_reference_alert_type VALUES (DEFAULT, 'ROAD_CLOSED ', 'ROAD_CLOSED_EVENT', 'ROUTE FERMÉE - MANIFESTATION');
 INSERT INTO waze.waze_reference_alert_type VALUES (DEFAULT, 'ROAD_CLOSED ', 'NO_SUBTYPE', 'AUCUN SOUS-TYPE');
+
+
+--Reference guide for alerts, jams and irregularities
+DROP TABLE IF EXISTS waze.waze_reference_road_type;
+CREATE TABLE waze.waze_reference_road_type (
+	gid serial4 NOT NULL, -- PK.
+	road_type integer NOT NULL, -- Type de route
+	label_en varchar NOT NULL, -- Libellé EN
+	label_fr varchar NOT NULL, -- Libellé FR
+	CONSTRAINT waze_reference_road_type_pk PRIMARY KEY (gid)
+);
+CREATE INDEX waze_reference_road_type_idx ON waze.waze_reference_road_type USING btree (road_type);
+COMMENT ON TABLE waze.waze_reference_road_type IS 'WAZE - Table de référence des différents types de route - Guide de référence pour les alertes, embouteillages et irrégularités';
+
+-- Column comments
+COMMENT ON COLUMN waze.waze_reference_road_type.gid IS 'PK.';
+COMMENT ON COLUMN waze.waze_reference_road_type.road_type IS 'Type de route';
+COMMENT ON COLUMN waze.waze_reference_road_type.label_en IS 'Libellé EN';
+COMMENT ON COLUMN waze.waze_reference_road_type.label_fr IS 'Libellé FR';
+
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 1, 'Street', 			'RUE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 2, 'Primary Street', 	'RUE PRINCIPALE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 3, 'Freeway', 			'AUTOROUTE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 4, 'Ramp', 				'RAMPE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 5, 'Trail', 				'PISTE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 6, 'Primary Street', 	'RUE PRINCIPALE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 7, 'Secondary Street', 	'RUE SECONDAIRE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 8, '4X4 Trails', 		'PISTES 4X4');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 9, 'Walkway', 			'PASSERELLE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 10, 'Pedestrian', 		'VOIE PIÉTONNE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 11, 'Exit', 				'SORTIE');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 14, '4X4 Trails', 		'PISTES 4X4');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 15, 'Ferry crossing', 	'TRAVERSÉE EN FERRY');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 16, 'Stairway', 			'ESCALIER');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 17, 'Private road', 		'CHEMIN PRIVÉ');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 18, 'Railroads', 		'CHEMIN DE FER');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 19, 'Runway/Taxiway', 	'PISTE/VOIE DE CIRCULATION');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 20, 'Parking lot road', 	'VOIE DE PARKING');
+INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 21, 'Service road', 		'SERVICE ROUTIER');
