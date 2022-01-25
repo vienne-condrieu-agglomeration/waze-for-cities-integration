@@ -53,7 +53,7 @@ WITH
 			CAST(json_array_elements(data_json -> 'alerts') ->> 'pubMillis' AS int8)/1000 AS waze_ts,
 			TO_TIMESTAMP(CAST(json_array_elements(data_json -> 'alerts') ->> 'pubMillis' AS bigint)/1000)::timestamp AS waze_creation_date,
 			AGE(now(), to_timestamp(CAST(json_array_elements(data_json -> 'alerts') ->> 'pubMillis' AS bigint)/1000)::timestamp) AS waze_alert_age,
-			TO_CHAR(TO_TIMESTAMP(CAST(json_array_elements(data_json -> 'alerts') ->> 'pubMillis' AS bigint)/1000)::timestamp, 'Le dd/mm/yyyy à HH24:MM:SS') AS date_fr_format,			
+			TO_CHAR(TO_TIMESTAMP(CAST(json_array_elements(data_json -> 'alerts') ->> 'pubMillis' AS bigint)/1000)::timestamp, 'Le dd/mm/yyyy à HH24:MI:SS') AS date_fr_format,			
 			json_array_elements(data_json -> 'alerts') AS json_src
 		  FROM waze.tmp_view_alerts_clustered
 	)
