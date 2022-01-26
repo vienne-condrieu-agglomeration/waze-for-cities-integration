@@ -134,7 +134,7 @@ WITH
 				CAST(json_array_elements(data_json -> 'jams') ->> 'segments' AS varchar) AS segments,
 				CAST(json_array_elements(data_json -> 'jams') ->> 'pubMillis' AS int8)/1000 AS waze_ts,
 				TO_TIMESTAMP(CAST(json_array_elements(data_json -> 'jams') ->> 'pubMillis' AS bigint)/1000)::timestamp AS waze_creation_date,
-				TO_CHAR(TO_TIMESTAMP(CAST(json_array_elements(data_json -> 'jams') ->> 'pubMillis' AS bigint)/1000)::timestamp, 'Le dd/mm/yyyy à HH24:MM:SS') AS date_fr_format,
+				TO_CHAR(TO_TIMESTAMP(CAST(json_array_elements(data_json -> 'jams') ->> 'pubMillis' AS bigint)/1000)::timestamp, 'Le dd/mm/yyyy à HH24:MI:SS') AS date_fr_format,
 				AGE(now(), to_timestamp(CAST(json_array_elements(data_json -> 'jams') ->> 'pubMillis' AS bigint)/1000)::timestamp) AS waze_alert_age
 		  FROM waze.tmp_view_jams_clustered
 		  ORDER BY uuid
