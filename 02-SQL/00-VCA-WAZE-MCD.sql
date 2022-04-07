@@ -147,3 +147,63 @@ INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 18, 'Railroads', 		'C
 INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 19, 'Runway/Taxiway', 	'PISTE/VOIE DE CIRCULATION');
 INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 20, 'Parking lot road', 	'VOIE DE PARKING');
 INSERT INTO waze.waze_reference_road_type VALUES (DEFAULT, 21, 'Service road', 		'SERVICE ROUTIER');
+
+
+-- waze.archive_view_jams_clustered definition
+DROP TABLE IF EXISTS waze.archive_view_jams_clustered;
+CREATE TABLE waze.archive_view_jams_clustered (
+	gid serial8 NOT NULL, -- PK.
+	uuid varchar NULL, -- ID.
+	blocking_alert_uuid varchar NULL, -- ID. BLOCKING ALERT
+	the_geom public.geometry(linestring, 4326) NULL, -- Géométrie
+	jam_type varchar NULL, -- Type d'embouteillage
+	jam_turntype varchar NULL, -- Type de virage
+	jam_level int4 NULL, -- Niveau de congestion du trafic (0 = flux libre - 5 = bloqué)
+	roadtype int4 NULL, -- Type de route
+	speed_kmh float8 NULL, -- Vitesse moyenne actuelle sur les segments bloqués en kmh
+	length_m float8 NULL, -- Longueur de l'embouteillage en mètres
+	start_node varchar NULL, -- Jonction/rue/ville la plus proche du début du blocage (fourni lorsque disponible)
+	end_node varchar NULL, -- Jonction/rue/ville la plus proche de la fin du blocage (fournie si disponible)
+	speed float8 NULL, -- Vitesse moyenne actuelle sur les segments bloqués en m/s
+	delay int4 NULL, -- Délai d'embouteillage (en secondes) par rapport à la vitesse d'écoulement libre (en cas de blocage, -1)
+	street varchar NULL, -- Nom de la voie
+	city varchar NULL, -- Ville
+	country varchar NULL, -- Pays
+	waze_ts int8 NULL, -- Horodatage de l'embouteillage signalé
+	waze_creation_date timestamp NULL, -- Créé le
+	date_fr_format text NULL, -- Créé le (libellé)
+	waze_alert_age interval NULL, -- Age
+	import_ts timestamp NULL, -- Horodatage de l'import de l'embouteillage
+	CONSTRAINT archive_view_jams_clustered_pkey PRIMARY KEY (gid)
+);
+CREATE INDEX archive_view_jams_clustered_geom_idx ON waze.archive_view_jams_clustered USING gist (the_geom);
+CREATE UNIQUE INDEX archive_view_jams_clustered_uuid_idx ON waze.archive_view_jams_clustered USING btree (uuid);
+COMMENT ON TABLE waze.archive_view_jams_clustered IS 'WAZE - Table d''archivage des linéaires d''embouteillages générés par WAZE';
+
+-- Column comments
+
+COMMENT ON COLUMN waze.archive_view_jams_clustered.gid IS 'PK.';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.uuid IS 'ID.';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.blocking_alert_uuid IS 'ID. BLOCKING ALERT';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.the_geom IS 'Géométrie';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.jam_type IS 'Type d''embouteillage';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.jam_turntype IS 'Type de virage';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.jam_level IS 'Niveau de congestion du trafic (0 = flux libre - 5 = bloqué)';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.roadtype IS 'Type de route';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.speed_kmh IS 'Vitesse moyenne actuelle sur les segments bloqués en kmh';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.length_m IS 'Longueur de l''embouteillage en mètres';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.start_node IS 'Jonction/rue/ville la plus proche du début du blocage (fourni lorsque disponible)';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.end_node IS 'Jonction/rue/ville la plus proche de la fin du blocage (fournie si disponible)';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.speed IS 'Vitesse moyenne actuelle sur les segments bloqués en m/s';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.delay IS 'Délai d''embouteillage (en secondes) par rapport à la vitesse d''écoulement libre (en cas de blocage, -1)';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.street IS 'Nom de la voie';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.city IS 'Ville';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.country IS 'Pays';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.waze_ts IS 'Horodatage de l''embouteillage signalé';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.waze_creation_date IS 'Créé le';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.date_fr_format IS 'Créé le (libellé)';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.waze_alert_age IS 'Age';
+COMMENT ON COLUMN waze.archive_view_jams_clustered.import_ts IS 'Horodatage de l''import de l''embouteillage';
+
+-- Permissions
+ALTER TABLE waze.archive_view_jams_clustered OWNER TO dyndb;
