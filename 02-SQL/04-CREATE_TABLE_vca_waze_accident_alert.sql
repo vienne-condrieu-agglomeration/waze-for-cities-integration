@@ -1,5 +1,7 @@
-DROP TABLE IF EXISTS waze.vca_waze_accident_alert;
-CREATE TABLE waze.vca_waze_accident_alert AS
+-- 05-CREATE_TABLE_vca_waze_accident_alert-ST_ClusterDBSCAN.sql
+--DROP TABLE IF EXISTS waze.vca_waze_accident_alert_dbscan;
+--CREATE TABLE waze.vca_waze_accident_alert_dbscan AS
+
 WITH
     waze_accidents AS (
         SELECT  waze.archive_view_alerts_clustered.gid,
@@ -21,9 +23,9 @@ WITH
             waze.archive_view_alerts_clustered.latitude,
             waze.archive_view_alerts_clustered.waze_ts,
             waze.archive_view_alerts_clustered.waze_creation_date,
-            --waze.archive_view_alerts_clustered.waze_alert_age,
+            waze.archive_view_alerts_clustered.waze_alert_age,
             waze.archive_view_alerts_clustered.date_fr_format,
-            --waze.archive_view_alerts_clustered.import_ts,            
+            waze.archive_view_alerts_clustered.import_ts,
             'epoch'::timestamptz + '1800 seconds'::interval * (EXTRACT(epoch FROM waze.archive_view_alerts_clustered.waze_creation_date::timestamptz)::int4 / 1800) AS expiry_interval_30mins
           FROM waze.archive_view_alerts_clustered
           INNER JOIN bdtopo.bdtopo_auvergnerhonealpes_administratif_commune
@@ -31,14 +33,16 @@ WITH
           WHERE alert_type = 'ACCIDENT'
           AND bdtopo.bdtopo_auvergnerhonealpes_administratif_commune.insee_com IN ('38087','38107','38110','38131','38157','38160','38199','38215','38232','38238','38318','38336','38459','38480','38484','38487','38544','38558','69007','69064','69080','69097','69118','69119','69189','69193','69235','69236','69252','69253')
           ORDER BY waze.archive_view_alerts_clustered.waze_creation_date DESC
+    ),
+    clusters_accidents AS (
+        SELECT  ST_ClusterDBSCAN(ST_TRANSFORM(waze_accidents.the_geom, 2154), eps := 25, minPoints := 1) OVER(ORDER BY gid) AS cluster_id, -- RGF93 pour 25m et 1 point
+          waze_accidents.*      
+        FROM waze_accidents
+    ),
+    clusters_accidents_partition AS (
+        SELECT  ST_ClusterDBSCAN(ST_TRANSFORM(waze_accidents.the_geom, 2154), eps := 25, minPoints := 1) OVER(PARTITION BY expiry_interval_30mins ORDER BY gid) AS cluster_id, -- RGF93 pour 25m et 1 point -- accidents en fonction de l'heure de la journée - ou intervalle de temps - après les avoir regroupés en cluster
+          waze_accidents.*      
+        FROM waze_accidents
     )
-SELECT  ST_COLLECT(waze_accidents.the_geom) AS the_geom,
-    waze_accidents.alert_type,
-    STRING_AGG(TRIM(BOTH FROM waze_accidents.alert_subtype), ',') AS alert_subtype_list,
-    COUNT(waze_accidents.expiry_interval_30mins) AS nb_accident,
-    STRING_AGG(waze_accidents.uuid, ',') AS uuid_list,
-    STRING_AGG(waze_accidents.date_fr_format, ', ') AS waze_creation_date_list,
-    waze_accidents.expiry_interval_30mins
-  FROM waze_accidents
-  --WHERE waze_accidents.uuid IN ('1cb59f45-3bde-4e7a-9f78-999ab3224108','6346d656-4682-47fa-9b8d-119e40352680')
-  GROUP BY waze_accidents.expiry_interval_30mins, waze_accidents.alert_type;
+SELECT  *
+  FROM clusters_accidents_partition;
