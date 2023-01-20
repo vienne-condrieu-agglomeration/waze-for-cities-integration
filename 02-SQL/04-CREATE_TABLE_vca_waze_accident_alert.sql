@@ -24,7 +24,7 @@ WITH
             --waze.archive_view_alerts_clustered.waze_alert_age,
             waze.archive_view_alerts_clustered.date_fr_format,
             --waze.archive_view_alerts_clustered.import_ts,            
-            'epoch'::timestamptz + '1800 seconds'::interval * (EXTRACT(epoch FROM waze.archive_view_alerts_clustered.waze_creation_date::timestamptz)::int4 / 1800) AS expiry_interval_15mins
+            'epoch'::timestamptz + '1800 seconds'::interval * (EXTRACT(epoch FROM waze.archive_view_alerts_clustered.waze_creation_date::timestamptz)::int4 / 1800) AS expiry_interval_30mins
           FROM waze.archive_view_alerts_clustered
           INNER JOIN bdtopo.bdtopo_auvergnerhonealpes_administratif_commune
             ON ST_CONTAINS(bdtopo.bdtopo_auvergnerhonealpes_administratif_commune.the_geom, ST_TRANSFORM(waze.archive_view_alerts_clustered.the_geom, 2154))
@@ -35,10 +35,10 @@ WITH
 SELECT  ST_COLLECT(waze_accidents.the_geom) AS the_geom,
     waze_accidents.alert_type,
     STRING_AGG(TRIM(BOTH FROM waze_accidents.alert_subtype), ',') AS alert_subtype_list,
-    COUNT(waze_accidents.expiry_interval_15mins) AS nb_accident,
+    COUNT(waze_accidents.expiry_interval_30mins) AS nb_accident,
     STRING_AGG(waze_accidents.uuid, ',') AS uuid_list,
     STRING_AGG(waze_accidents.date_fr_format, ', ') AS waze_creation_date_list,
-    waze_accidents.expiry_interval_15mins
+    waze_accidents.expiry_interval_30mins
   FROM waze_accidents
   --WHERE waze_accidents.uuid IN ('1cb59f45-3bde-4e7a-9f78-999ab3224108','6346d656-4682-47fa-9b8d-119e40352680')
-  GROUP BY waze_accidents.expiry_interval_15mins, waze_accidents.alert_type;
+  GROUP BY waze_accidents.expiry_interval_30mins, waze_accidents.alert_type;
