@@ -44,4 +44,4 @@ WITH
         FROM waze_accidents
     )
 SELECT  *
-  FROM clusters_accidents
+  FROM clusters_accidents_partition;
