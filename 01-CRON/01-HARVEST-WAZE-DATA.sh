@@ -6,7 +6,7 @@ cd /opt/data/vca/cron/waze/data
 sudo rm -Rf /opt/data/vca/cron/waze/data/*
 echo "READY TO DOWNLOAD WAZE DATA !"
 
-#TELECHARGEMENT DES ZONAGES DU GPU
+#TELECHARGEMENT DES DONNEES WAZE
 echo "1/X : DATA DOWNLOAD FROM WAZE DATA FEED - ALERTS - Données sur les conditions de circulation mises à jour toutes les 2 minutes"
 wget "https://world-georss.waze.com/rtserver/web/TGeoRSS?tk=ccp_partner&ccp_partner_name=partner_VienneCondrieuAgglomeration&format=JSON&types=alerts&polygon=4.64857000739179,45.4316591278279;4.64857000739179,45.6131681796003;5.08746662497162,45.6131681796003;5.08746662497162,45.4316591278279;4.64857000739179,45.4316591278279" \
 	-O waze-view-alerts-clustered.json
