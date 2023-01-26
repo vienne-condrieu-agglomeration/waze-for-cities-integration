@@ -7,19 +7,19 @@ sudo rm -Rf /opt/data/vca/cron/waze/data/*
 echo "READY TO DOWNLOAD WAZE DATA !"
 
 #TELECHARGEMENT DES FEED JSON
-echo "1/4 : DATA DOWNLOAD FROM WAZE DATA FEED - ALERTS - Données sur les conditions de circulation mises à jour toutes les 2 minutes"
+echo "1/5 : DATA DOWNLOAD FROM WAZE DATA FEED - ALERTS - Données sur les conditions de circulation mises à jour toutes les 2 minutes"
 wget "https://world-georss.waze.com/rtserver/web/TGeoRSS?tk=ccp_partner&ccp_partner_name=partner_VienneCondrieuAgglomeration&format=JSON&types=alerts&polygon=4.64857000739179,45.4316591278279;4.64857000739179,45.6131681796003;5.08746662497162,45.6131681796003;5.08746662497162,45.4316591278279;4.64857000739179,45.4316591278279" \
 	-O waze-view-alerts-clustered.json
 
-echo "2/4 : DATA DOWNLOAD FROM WAZE DATA FEED - TRAFFIC - Données sur les conditions de circulation mises à jour toutes les 2 minutes"
+echo "2/5 : DATA DOWNLOAD FROM WAZE DATA FEED - TRAFFIC - Données sur les conditions de circulation mises à jour toutes les 2 minutes"
 wget "https://world-georss.waze.com/rtserver/web/TGeoRSS?tk=ccp_partner&ccp_partner_name=partner_VienneCondrieuAgglomeration&format=JSON&types=traffic&polygon=4.64857000739179,45.4316591278279;4.64857000739179,45.6131681796003;5.08746662497162,45.6131681796003;5.08746662497162,45.4316591278279;4.64857000739179,45.4316591278279" \
 	-O waze-view-jams-clustered.json
 	
-echo "3/4 : DATA DOWNLOAD FROM WAZE DATA FEED - IRREGULARITIES - Données sur les conditions de circulation mises à jour toutes les 2 minutes"
+echo "3/5 : DATA DOWNLOAD FROM WAZE DATA FEED - IRREGULARITIES - Données sur les conditions de circulation mises à jour toutes les 2 minutes"
 wget "https://world-georss.waze.com/rtserver/web/TGeoRSS?tk=ccp_partner&ccp_partner_name=partner_VienneCondrieuAgglomeration&format=JSON&types=irregularities&polygon=4.64857000739179,45.4316591278279;4.64857000739179,45.6131681796003;5.08746662497162,45.6131681796003;5.08746662497162,45.4316591278279;4.64857000739179,45.4316591278279" \
 	-O waze-view-irregularities-clustered.json
 	
-echo "4/4 : DATA DOWNLOAD FROM WAZE DATA FEED - VIEW TRAFFIC - Flux de données Waze Traffic View mises à jour toutes les 2 minutes"
+echo "4/5 : DATA DOWNLOAD FROM WAZE DATA FEED - VIEW TRAFFIC - Flux de données Waze Traffic View mises à jour toutes les 2 minutes"
 wget "https://www.waze.com/row-partnerhub-api/feeds-tvt/?id=18130651827" \
 	-O waze-traffic-view-feed.json
 
@@ -27,7 +27,7 @@ wget "https://www.waze.com/row-partnerhub-api/feeds-tvt/?id=18130651827" \
 sudo chmod -Rf 777 /opt/data/vca/cron/waze/data/*
 	
 #IMPORT DES DONNEES DANS LA BDD PGSQL
-echo "4/X : IMPORT DES DONNEES DANS LA BDD PGSQL - ALERTS"
+echo "4/5 : IMPORT DES DONNEES DANS LA BDD PGSQL - ALERTS"
 sudo -u postgres -H -- psql -d vca -f "../SQL/01-IMPORT-DATA-FROM-WAZE-DATA-FEED.sql"
 
 #ON REVIENT DANS LE DOSSIER DE TRAVAIL
