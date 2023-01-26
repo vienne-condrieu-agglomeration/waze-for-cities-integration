@@ -112,11 +112,34 @@ CREATE TABLE waze.tmp_view_jams_clustered (
 COPY waze.tmp_view_jams_clustered (data_json)
   FROM '/opt/data/vca/cron/waze/data/waze-view-jams-clustered.json';
   
-DROP TABLE IF EXISTS waze.view_jams_clustered;
-CREATE TABLE waze.view_jams_clustered AS
+-- CREATE JAMS ARCHIVE TABLE
+INSERT INTO waze.archive_view_jams_clustered (
+	uuid,
+	blocking_alert_uuid,
+	the_geom,
+	jam_type,
+	jam_turntype,
+	jam_level,
+	roadtype,
+	speed_kmh,
+	length_m,
+	start_node,
+	end_node,
+	speed,
+	delay,
+	street,
+	city,
+	country,
+	waze_ts,
+	waze_creation_date,
+	date_fr_format,
+	waze_alert_age,
+	import_ts
+)
 WITH
 	view_jams_clustered_element AS (
 		SELECT	CAST(json_array_elements(data_json -> 'jams') ->> 'uuid' AS varchar) AS uuid,
+				CAST(json_array_elements(data_json -> 'jams') ->> 'blockingAlertUuid' AS varchar) AS blocking_alert_uuid,
 				json_array_elements(data_json -> 'jams') -> 'line' AS line,
 				CAST(json_array_elements(data_json -> 'jams') ->> 'type' AS varchar) AS jam_type,
 				CAST(json_array_elements(data_json -> 'jams') ->> 'turnType' AS varchar) AS jam_turntype,
@@ -141,6 +164,7 @@ WITH
 	),
 	view_jams_clustered_points AS (
 		SELECT 	view_jams_clustered_element.uuid,
+			view_jams_clustered_element.blocking_alert_uuid,
 			json_array_elements(view_jams_clustered_element.line) AS line,
 			CAST(json_array_elements(view_jams_clustered_element.line) ->> 'x' AS numeric) AS longitude,
 			CAST(json_array_elements(view_jams_clustered_element.line) ->> 'y' AS numeric) AS latitude,
@@ -167,6 +191,7 @@ WITH
 	view_jams_clustered_line AS (
 		SELECT	row_number() OVER(ORDER BY view_jams_clustered_points.uuid) AS point_order,
 				view_jams_clustered_points.uuid,
+				view_jams_clustered_points.blocking_alert_uuid,
 				ST_SetSRID(ST_MAKEPOINT(view_jams_clustered_points.longitude, view_jams_clustered_points.latitude),4326)::geometry(POINT,4326) AS the_geom,
 				view_jams_clustered_points.longitude,
 				view_jams_clustered_points.latitude,
@@ -192,8 +217,9 @@ WITH
 		  FROM view_jams_clustered_points
 		  ORDER BY view_jams_clustered_points.uuid
 	)
-SELECT	row_number() OVER(ORDER BY view_jams_clustered_line.uuid) AS gid,
+SELECT	--row_number() OVER(ORDER BY view_jams_clustered_line.uuid) AS gid,
 		view_jams_clustered_line.uuid,
+		view_jams_clustered_line.blocking_alert_uuid,
 		ST_SetSRID(ST_MakeLine(view_jams_clustered_line.the_geom ORDER BY view_jams_clustered_line.point_order),4326)::geometry(LINESTRING,4326) AS the_geom,				
 		view_jams_clustered_line.jam_type,
 		view_jams_clustered_line.jam_turntype,
@@ -214,37 +240,26 @@ SELECT	row_number() OVER(ORDER BY view_jams_clustered_line.uuid) AS gid,
 		view_jams_clustered_line.waze_alert_age,
 		now()::timestamp AS import_ts
   FROM view_jams_clustered_line
-  GROUP BY uuid,jam_type,jam_turntype,jam_level,roadtype,speed_kmh,length_m,start_node,end_node,speed,delay,street,country,city,waze_ts,waze_creation_date,date_fr_format,waze_alert_age
-  ORDER BY view_jams_clustered_line.uuid;
-
-ALTER TABLE waze.view_jams_clustered ADD PRIMARY KEY(gid);
-CREATE INDEX view_jams_clustered_geom_idx ON waze.view_jams_clustered USING gist (the_geom);
-CREATE UNIQUE INDEX view_jams_clustered_uuid_idx ON waze.view_jams_clustered USING btree (uuid);
-COMMENT ON TABLE waze.view_jams_clustered IS 'WAZE - Table des linéaires d''embouteillages générés par WAZE';
-
--- Column comments
-COMMENT ON COLUMN waze.view_jams_clustered.gid IS 'PK.';
-COMMENT ON COLUMN waze.view_jams_clustered.uuid IS 'ID.';
-COMMENT ON COLUMN waze.view_jams_clustered.the_geom IS 'Géométrie';
-COMMENT ON COLUMN waze.view_jams_clustered.jam_type IS 'Type d''embouteillage';
-COMMENT ON COLUMN waze.view_jams_clustered.jam_turntype IS 'Type de virage';
-COMMENT ON COLUMN waze.view_jams_clustered.jam_level IS 'Niveau de congestion du trafic (0 = flux libre - 5 = bloqué)';
-COMMENT ON COLUMN waze.view_jams_clustered.roadtype IS 'Type de route';
-COMMENT ON COLUMN waze.view_jams_clustered.speed_kmh IS 'Vitesse moyenne actuelle sur les segments bloqués en kmh';
-COMMENT ON COLUMN waze.view_jams_clustered.length_m IS 'Longueur de l''embouteillage en mètres';
-COMMENT ON COLUMN waze.view_jams_clustered.start_node IS 'Jonction/rue/ville la plus proche du début du blocage (fourni lorsque disponible)';
-COMMENT ON COLUMN waze.view_jams_clustered.end_node IS 'Jonction/rue/ville la plus proche de la fin du blocage (fournie si disponible)';
-COMMENT ON COLUMN waze.view_jams_clustered.speed IS 'Vitesse moyenne actuelle sur les segments bloqués en m/s';
-COMMENT ON COLUMN waze.view_jams_clustered.delay IS 'Délai d''embouteillage (en secondes) par rapport à la vitesse d''écoulement libre (en cas de blocage, -1)';
-COMMENT ON COLUMN waze.view_jams_clustered.street IS 'Nom de la voie';
-COMMENT ON COLUMN waze.view_jams_clustered.city IS 'Ville';
-COMMENT ON COLUMN waze.view_jams_clustered.country IS 'Pays';
-COMMENT ON COLUMN waze.view_jams_clustered.waze_ts IS 'Horodatage de l''embouteillage signalé';
-COMMENT ON COLUMN waze.view_jams_clustered.waze_creation_date IS 'Créé le';
-COMMENT ON COLUMN waze.view_jams_clustered.date_fr_format IS 'Créé le (libellé)';
-COMMENT ON COLUMN waze.view_jams_clustered.waze_alert_age IS 'Age';
-COMMENT ON COLUMN waze.view_jams_clustered.import_ts IS 'Horodatage de l''import de l''embouteillage';
-
+  GROUP BY uuid,blocking_alert_uuid,jam_type,jam_turntype,jam_level,roadtype,speed_kmh,length_m,start_node,end_node,speed,delay,street,country,city,waze_ts,waze_creation_date,date_fr_format,waze_alert_age
+  ON CONFLICT (uuid) DO
+	UPDATE SET the_geom	 	= archive_view_jams_clustered.the_geom,
+		jam_type 			= archive_view_jams_clustered.jam_type,
+		jam_turntype		= archive_view_jams_clustered.jam_turntype,
+		jam_level 			= archive_view_jams_clustered.jam_level,
+		roadtype 			= archive_view_jams_clustered.roadtype,
+		speed_kmh 			= archive_view_jams_clustered.speed_kmh,
+		length_m 			= archive_view_jams_clustered.length_m,
+		start_node 			= archive_view_jams_clustered.start_node,
+		end_node 			= archive_view_jams_clustered.end_node,
+		speed 				= archive_view_jams_clustered.speed,
+		delay 				= archive_view_jams_clustered.delay,
+		street 				= archive_view_jams_clustered.street,
+		city 				= archive_view_jams_clustered.city,
+		country 			= archive_view_jams_clustered.country,
+		waze_ts 			= archive_view_jams_clustered.waze_ts,
+		waze_creation_date 	= archive_view_jams_clustered.waze_creation_date,
+		date_fr_format 		= archive_view_jams_clustered.date_fr_format,
+		waze_alert_age 		= archive_view_jams_clustered.waze_alert_age;
 /******************************************************* END JAMS TABLES *********************************************************/
 
 /**************************************************** IRREGULARITIES TABLES ******************************************************/
@@ -260,7 +275,6 @@ CREATE TABLE waze.tmp_view_irregularities_clustered (
 --COPIE DU JSON
 COPY waze.tmp_view_irregularities_clustered (data_json)
   FROM '/opt/data/vca/cron/waze/data/waze-view-irregularities-clustered.json';
-
 /**************************************************** IRREGULARITIES TABLES ******************************************************/
 
 /***************************************************** TRAFFIC VIEW TABLES *******************************************************/
@@ -279,6 +293,8 @@ COPY waze.tmp_view_traffic_view_watchlist (data_json)
   FROM '/opt/data/vca/cron/waze/data/waze-traffic-view-feed.json';
   
 -- Watchlist
+DROP TABLE IF EXISTS waze.vca_waze_traffic_view_watchlist CASCADE;
+CREATE TABLE waze.vca_waze_traffic_view_watchlist AS
 WITH 
     users_on_jams AS (
         SELECT  CAST(json_array_elements(data_json -> 'usersOnJams') ->> 'wazersCount' AS float4) AS wazers_count,
@@ -365,6 +381,29 @@ SELECT  row_number() OVER(ORDER BY routes_line.id) AS gid,
         routes_line.time_inseconds,
         routes_line.TYPE
   ORDER BY routes_line.id;
+  
+
+ALTER TABLE waze.vca_waze_traffic_view_watchlist ADD PRIMARY KEY(gid);
+CREATE INDEX vca_waze_traffic_view_watchlist_geom_idx ON waze.vca_waze_traffic_view_watchlist USING gist (the_geom);
+CREATE UNIQUE INDEX vca_waze_traffic_view_watchlist_id_idx ON waze.vca_waze_traffic_view_watchlist USING btree (id);
+COMMENT ON TABLE waze.vca_waze_traffic_view_watchlist IS 'WAZE - Table du flux d''affichage du trafic Waze - Watchlist';
+
+-- Column comments
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.gid IS 'PK.';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.id IS 'ID.';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.the_geom IS 'Géométrie';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.to_name IS 'Nom fourni par le propriétaire du flux, décrit l''itinéraire';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.historic_time IS 'Temps en secondes qu''il faut habituellement pour traverser cette itinéraire le jour de la semaine et l''heure actuel';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.sub_routes IS 'Liste des sous-routes';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.bbox IS 'Enveloppe de la géométrie';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.name IS 'Désignation du tronçon à surveiller';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.from_name IS 'Nom fourni par le propriétaire du flux, décrit l''itinéraire';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.length IS 'Longueur du parcours en mètres';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.jam_level IS 'Niveau d''embouteillage total de l''itinéraire : 0=Pas d''embouteillage à 4=arrêt';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.time_inseconds IS 'Temps en secondes qu''il faut pour traverser l''itinéraire en ce moment';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist."type" IS 'Type';
+COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.import_ts IS 'Horodatage de l''import de l''alerte';
 /***************************************************** TRAFFIC VIEW TABLES *******************************************************/
+
 
 COMMIT;
