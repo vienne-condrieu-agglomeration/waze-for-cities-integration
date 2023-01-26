@@ -266,17 +266,105 @@ COPY waze.tmp_view_irregularities_clustered (data_json)
 /***************************************************** TRAFFIC VIEW TABLES *******************************************************/
 --waze_traffic_view_feed_spec
 --DROP TABLE
-DROP TABLE IF EXISTS waze.tmp_view_traffic_view_clustered CASCADE;
+DROP TABLE IF EXISTS waze.tmp_view_traffic_view_watchlist CASCADE;
 
 --CREATE TABLE
-CREATE TABLE waze.tmp_view_traffic_view_clustered (
+CREATE TABLE waze.tmp_view_traffic_view_watchlist (
 	gid serial NOT NULL PRIMARY KEY,
 	data_json json NOT NULL
 );
 
 --COPIE DU JSON
-COPY waze.tmp_view_traffic_view_clustered (data_json)
+COPY waze.tmp_view_traffic_view_watchlist (data_json)
   FROM '/opt/data/vca/cron/waze/data/waze-traffic-view-feed.json';
+  
+-- Watchlist
+WITH 
+    users_on_jams AS (
+        SELECT  CAST(json_array_elements(data_json -> 'usersOnJams') ->> 'wazersCount' AS float4) AS wazers_count,
+                CAST(json_array_elements(data_json -> 'usersOnJams') ->> 'jamLevel' AS integer) AS jam_level
+                -- json_array_elements(data_json -> 'usersOnJams')
+          FROM waze.tmp_view_traffic_view_watchlist
+    ),
+    routes AS (
+        SELECT  CAST(json_array_elements(data_json -> 'routes') ->> 'id' AS varchar) AS id,
+                json_array_elements(data_json -> 'routes') -> 'line' AS line,                
+                CAST(json_array_elements(data_json -> 'routes') ->> 'toName' AS varchar) AS to_name,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'historicTime' AS varchar) AS historic_time,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'subRoutes' AS varchar) AS sub_routes,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'bbox' AS varchar) AS bbox,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'name' AS varchar) AS name,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'fromName' AS varchar) AS from_name,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'length' AS varchar) AS length,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'jamLevel' AS varchar) AS jam_level,                
+                CAST(json_array_elements(data_json -> 'routes') ->> 'time' AS varchar) AS time_inseconds,
+                CAST(json_array_elements(data_json -> 'routes') ->> 'type' AS varchar) AS type
+                -- json_array_elements(data_json -> 'routes')
+          FROM waze.tmp_view_traffic_view_watchlist
+    ),
+    routes_point AS (
+       SELECT   routes.id,
+                json_array_elements(routes.line) AS line,
+                CAST(json_array_elements(routes.line) ->> 'x' AS numeric) AS longitude,
+                CAST(json_array_elements(routes.line) ->> 'y' AS numeric) AS latitude,
+                routes.to_name,
+                routes.historic_time,
+                routes.sub_routes,
+                routes.bbox,
+                routes.name,
+                routes.from_name,
+                routes.length,
+                routes.jam_level,
+                routes.time_inseconds,
+                routes.type
+         FROM routes
+    ),
+    routes_line AS (
+        SELECT  row_number() OVER(ORDER BY routes_point.id) AS point_order,
+                routes_point.id,
+                ST_SetSRID(ST_MAKEPOINT(routes_point.longitude, routes_point.latitude),4326)::geometry(POINT,4326) AS the_geom,
+                routes_point.line,
+                routes_point.longitude,
+                routes_point.latitude,
+                routes_point.to_name,
+                routes_point.historic_time,
+                routes_point.sub_routes,
+                routes_point.bbox,
+                routes_point.name,
+                routes_point.from_name,
+                routes_point.length,
+                routes_point.jam_level,
+                routes_point.time_inseconds,
+                routes_point.type       
+          FROM routes_point
+    )
+SELECT  row_number() OVER(ORDER BY routes_line.id) AS gid,
+        routes_line.id,
+        ST_SetSRID(ST_MakeLine(routes_line.the_geom ORDER BY routes_line.point_order),4326)::geometry(LINESTRING,4326) AS the_geom,
+        routes_line.to_name,
+        routes_line.historic_time,
+        routes_line.sub_routes,
+        routes_line.bbox,
+        routes_line.name,
+        routes_line.from_name,
+        routes_line.length,
+        routes_line.jam_level,
+        routes_line.time_inseconds,
+        routes_line.type,
+        now()::timestamp AS import_ts
+  FROM routes_line
+  GROUP BY routes_line.id,
+        routes_line.to_name,
+        routes_line.historic_time,
+        routes_line.sub_routes,
+        routes_line.bbox,
+        routes_line.name,
+        routes_line.from_name,
+        routes_line.length,
+        routes_line.jam_level,
+        routes_line.time_inseconds,
+        routes_line.TYPE
+  ORDER BY routes_line.id;
 /***************************************************** TRAFFIC VIEW TABLES *******************************************************/
 
 COMMIT;
