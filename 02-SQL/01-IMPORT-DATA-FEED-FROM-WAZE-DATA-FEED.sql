@@ -425,7 +425,7 @@ SELECT  routes_line.uuid,
         routes_bbox.bbox_min_y,
         routes_bbox.bbox_max_x,
         routes_bbox.bbox_max_y
-  ON CONFLICT (uuid) DO
+   ON CONFLICT (uuid) DO
     UPDATE SET the_geom     = archive_view_traffic_clustered.the_geom,
         the_bbox            = archive_view_traffic_clustered.the_bbox,
         to_name             = archive_view_traffic_clustered.to_name,
@@ -442,6 +442,5 @@ SELECT  routes_line.uuid,
         bbox_max_y          = archive_view_traffic_clustered.bbox_max_y,
         import_ts           = archive_view_traffic_clustered.import_ts;
 /***************************************************** TRAFFIC VIEW TABLES *******************************************************/
-
 
 COMMIT;
