@@ -293,8 +293,27 @@ COPY waze.tmp_view_traffic_view_watchlist (data_json)
   FROM '/opt/data/vca/cron/waze/data/waze-traffic-view-feed.json';
   
 -- Watchlist
-DROP TABLE IF EXISTS waze.vca_waze_traffic_view_watchlist CASCADE;
-CREATE TABLE waze.vca_waze_traffic_view_watchlist AS
+-- CREATE TRAFFIC ARCHIVE TABLE
+INSERT INTO waze.archive_view_traffic_clustered (
+    uuid,
+    the_geom,
+    the_bbox,
+    to_name,
+    historic_time,
+    sub_routes,
+    bbox,
+    "name",
+    from_name,
+    length,
+    jam_level,
+    time_inseconds,
+    "type",    
+    bbox_min_x,
+    bbox_min_y,
+    bbox_max_x,
+    bbox_max_y,
+    import_ts
+)
 WITH 
     users_on_jams AS (
         SELECT  CAST(json_array_elements(data_json -> 'usersOnJams') ->> 'wazersCount' AS float4) AS wazers_count,
@@ -303,8 +322,8 @@ WITH
           FROM waze.tmp_view_traffic_view_watchlist
     ),
     routes AS (
-        SELECT  CAST(json_array_elements(data_json -> 'routes') ->> 'id' AS varchar) AS id,
-                json_array_elements(data_json -> 'routes') -> 'line' AS line,                
+        SELECT  CAST(json_array_elements(data_json -> 'routes') ->> 'id' AS varchar) AS uuid,
+                json_array_elements(data_json -> 'routes') -> 'line' AS line,
                 CAST(json_array_elements(data_json -> 'routes') ->> 'toName' AS varchar) AS to_name,
                 CAST(json_array_elements(data_json -> 'routes') ->> 'historicTime' AS varchar) AS historic_time,
                 CAST(json_array_elements(data_json -> 'routes') ->> 'subRoutes' AS varchar) AS sub_routes,
@@ -319,7 +338,7 @@ WITH
           FROM waze.tmp_view_traffic_view_watchlist
     ),
     routes_point AS (
-       SELECT   routes.id,
+       SELECT   routes.uuid,
                 json_array_elements(routes.line) AS line,
                 CAST(json_array_elements(routes.line) ->> 'x' AS numeric) AS longitude,
                 CAST(json_array_elements(routes.line) ->> 'y' AS numeric) AS latitude,
@@ -336,8 +355,8 @@ WITH
          FROM routes
     ),
     routes_line AS (
-        SELECT  row_number() OVER(ORDER BY routes_point.id) AS point_order,
-                routes_point.id,
+        SELECT  row_number() OVER() AS point_order,
+                routes_point.uuid,
                 ST_SetSRID(ST_MAKEPOINT(routes_point.longitude, routes_point.latitude),4326)::geometry(POINT,4326) AS the_geom,
                 routes_point.line,
                 routes_point.longitude,
@@ -353,10 +372,25 @@ WITH
                 routes_point.time_inseconds,
                 routes_point.type       
           FROM routes_point
+    ),
+    routes_bbox AS (
+        SELECT  routes.uuid,
+            routes.bbox::json ->> 'minX' AS bbox_min_x,
+            routes.bbox::json ->> 'minY' AS bbox_min_y,
+            routes.bbox::json ->> 'maxX' AS bbox_max_x,
+            routes.bbox::json ->> 'maxY' AS bbox_max_y,
+            ST_MakeEnvelope(
+                (routes.bbox::json ->> 'minX')::double precision,
+                (routes.bbox::json ->> 'minY')::double precision,
+                (routes.bbox::json ->> 'maxX')::double precision,
+                (routes.bbox::json ->> 'maxY')::double precision,
+                4326
+            )::GEOMETRY(POLYGON, 4326) AS the_bbox
+          FROM routes
     )
-SELECT  row_number() OVER(ORDER BY routes_line.id) AS gid,
-        routes_line.id,
+SELECT  routes_line.uuid,
         ST_SetSRID(ST_MakeLine(routes_line.the_geom ORDER BY routes_line.point_order),4326)::geometry(LINESTRING,4326) AS the_geom,
+        routes_bbox.the_bbox,
         routes_line.to_name,
         routes_line.historic_time,
         routes_line.sub_routes,
@@ -367,9 +401,15 @@ SELECT  row_number() OVER(ORDER BY routes_line.id) AS gid,
         routes_line.jam_level,
         routes_line.time_inseconds,
         routes_line.type,
+        routes_bbox.bbox_min_x::float4,
+        routes_bbox.bbox_min_y::float4,
+        routes_bbox.bbox_max_x::float4,
+        routes_bbox.bbox_max_y::float4,
         now()::timestamp AS import_ts
   FROM routes_line
-  GROUP BY routes_line.id,
+  INNER JOIN routes_bbox
+    ON routes_bbox.uuid = routes_line.uuid
+  GROUP BY routes_line.uuid,
         routes_line.to_name,
         routes_line.historic_time,
         routes_line.sub_routes,
@@ -379,30 +419,28 @@ SELECT  row_number() OVER(ORDER BY routes_line.id) AS gid,
         routes_line.length,
         routes_line.jam_level,
         routes_line.time_inseconds,
-        routes_line.TYPE
-  ORDER BY routes_line.id;
-  
-
-ALTER TABLE waze.vca_waze_traffic_view_watchlist ADD PRIMARY KEY(gid);
-CREATE INDEX vca_waze_traffic_view_watchlist_geom_idx ON waze.vca_waze_traffic_view_watchlist USING gist (the_geom);
-CREATE UNIQUE INDEX vca_waze_traffic_view_watchlist_id_idx ON waze.vca_waze_traffic_view_watchlist USING btree (id);
-COMMENT ON TABLE waze.vca_waze_traffic_view_watchlist IS 'WAZE - Table du flux d''affichage du trafic Waze - Watchlist';
-
--- Column comments
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.gid IS 'PK.';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.id IS 'ID.';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.the_geom IS 'Géométrie';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.to_name IS 'Nom fourni par le propriétaire du flux, décrit l''itinéraire';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.historic_time IS 'Temps en secondes qu''il faut habituellement pour traverser cette itinéraire le jour de la semaine et l''heure actuel';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.sub_routes IS 'Liste des sous-routes';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.bbox IS 'Enveloppe de la géométrie';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.name IS 'Désignation du tronçon à surveiller';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.from_name IS 'Nom fourni par le propriétaire du flux, décrit l''itinéraire';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.length IS 'Longueur du parcours en mètres';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.jam_level IS 'Niveau d''embouteillage total de l''itinéraire : 0=Pas d''embouteillage à 4=arrêt';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.time_inseconds IS 'Temps en secondes qu''il faut pour traverser l''itinéraire en ce moment';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist."type" IS 'Type';
-COMMENT ON COLUMN waze.vca_waze_traffic_view_watchlist.import_ts IS 'Horodatage de l''import de l''alerte';
+        routes_line.TYPE,
+        routes_bbox.the_bbox,
+        routes_bbox.bbox_min_x,
+        routes_bbox.bbox_min_y,
+        routes_bbox.bbox_max_x,
+        routes_bbox.bbox_max_y
+  ON CONFLICT (uuid) DO
+    UPDATE SET the_geom     = archive_view_traffic_clustered.the_geom,
+        the_bbox            = archive_view_traffic_clustered.the_bbox,
+        to_name             = archive_view_traffic_clustered.to_name,
+        historic_time       = archive_view_traffic_clustered.historic_time,
+        sub_routes          = archive_view_traffic_clustered.sub_routes,
+        "name"              = archive_view_traffic_clustered."name",
+        length              = archive_view_traffic_clustered.length,
+        jam_level           = archive_view_traffic_clustered.jam_level,
+        time_inseconds      = archive_view_traffic_clustered.time_inseconds,
+        "type"              = archive_view_traffic_clustered."type",
+        bbox_min_x          = archive_view_traffic_clustered.bbox_min_x,
+        bbox_min_y          = archive_view_traffic_clustered.bbox_min_y,
+        bbox_max_x          = archive_view_traffic_clustered.bbox_max_x,
+        bbox_max_y          = archive_view_traffic_clustered.bbox_max_y,
+        import_ts           = archive_view_traffic_clustered.import_ts;
 /***************************************************** TRAFFIC VIEW TABLES *******************************************************/
 
 
